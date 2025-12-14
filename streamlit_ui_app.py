@@ -174,18 +174,53 @@ if "selected_currency" not in st.session_state:
 
 
 # =====================================================
-# HELPER FUNCTIONS
+# CURRENCY FUNCTIONS
 # =====================================================
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def fetch_currency_rates():
+    """Fetch latest currency rates from database"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            """
+            SELECT currency_code, rate_to_usd
+            FROM currency_rates
+            WHERE currency_code = 'LBP'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        )
+        rates_data = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        # Build rates dictionary (rate_to_usd means how many units per 1 USD)
+        rates = {"USD": 1.0}
+        for row in rates_data:
+            if row["currency_code"] == "LBP":
+                rates["LBP"] = float(row["rate_to_usd"])
+
+        # Fallback if LBP rate is missing
+        if "LBP" not in rates:
+            rates["LBP"] = 89500  # 1 USD = 89,500 LBP
+
+        return rates
+    except Exception as e:
+        # Fallback rates if database unavailable
+        return {"USD": 1.0, "LBP": 89500}
+
+
 def convert_price(usd_price, target_currency="LBP"):
-    """Convert USD price to other currencies"""
-    rates = {"USD": 1.0, "LBP": 89500, "EUR": 0.92}  # Dictionary
+    """Convert USD price to other currencies using live rates"""
+    rates = fetch_currency_rates()
     return usd_price * rates.get(target_currency, 1.0)
 
 
 def format_price(usd_price, currency="USD"):
     """Format price with currency symbol"""
     converted = convert_price(usd_price, currency)
-    symbols = {"USD": "$", "LBP": "LL", "EUR": "€"}  # Dictionary
+    symbols = {"USD": "$", "LBP": "LL"}
     return f"{symbols[currency]}{converted:,.2f}"
 
 
@@ -202,7 +237,6 @@ page = st.sidebar.radio(
     [
         "🏠 Home",
         "🛍️ Shop",
-        "💎 Gemstone Guide",
         "🤖 AI Assistant",
         "🛒 Cart",
         "📍 Delivery Info",
@@ -212,8 +246,15 @@ page = st.sidebar.radio(
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 💱 Currency")
 st.session_state.selected_currency = st.sidebar.selectbox(
-    "Select Currency", ["USD", "LBP", "EUR"], index=0
+    "Select Currency", ["USD", "LBP"], index=1
 )
+
+# Show current exchange rate from database
+rates = fetch_currency_rates()
+with st.sidebar.expander("📊 Current Exchange Rates"):
+    st.write(f"🇺🇸 USD: 1.00")
+    st.write(f"🇱🇧 LBP: {rates['LBP']:,.0f}")
+    st.caption("Rates updated hourly from database")
 
 # =====================================================
 # PAGE: HOME
@@ -230,27 +271,6 @@ if page == "🏠 Home":
         st.metric("Islamic Gemstones", "9", delta="Authentic")
     with col3:
         st.metric("Delivery Zones", "8", delta="Across Lebanon")
-
-    st.markdown("---")
-
-    # Featured Categories
-    st.subheader("✨ Featured Categories")
-
-    col1, col2, col3, col4 = st.columns(4)
-    categories = [
-        ("Aqeeq Rings", "💍", "Traditional Sunnah designs"),
-        ("Tasbih", "📿", "Prayer beads for dhikr"),
-        ("Islamic Pendants", "🔮", "Ayat al-Kursi & calligraphy"),
-        ("Gemstones", "💎", "Sacred stones guide"),
-    ]
-
-    for col, (name, emoji, desc) in zip([col1, col2, col3, col4], categories):
-        with col:
-            st.markdown(f"### {emoji} {name}")
-            st.markdown(desc)
-            if st.button(f"Browse {name}", key=name):
-                st.session_state.page = "🛍️ Shop"
-                st.rerun()
 
     st.markdown("---")
 
@@ -399,57 +419,6 @@ elif page == "🛍️ Shop":
                 if st.button("Close", key="close_modal"):
                     st.session_state.show_modal = False
                     st.rerun()
-
-# =====================================================
-# PAGE: GEMSTONE GUIDE
-# =====================================================
-elif page == "💎 Gemstone Guide":
-    st.title("💎 Gemstone Education Guide")
-    st.markdown("Learn about the sacred stones and their significance")
-
-    # Fetch stones data
-    stones = fetch_stones()
-
-    # Tabs for different aspects
-    tab1, tab2, tab3 = st.tabs(
-        ["🕌 Islamic Significance", "🌍 Cultural History", "⚕️ Healing Properties"]
-    )
-
-    with tab1:
-        st.markdown("### Islamic Gemstones in Tradition")
-
-        # Filter Sunnah stones using dict comprehension
-        sunnah_stones = {k: v for k, v in stones.items() if v["sunnah_stone"]}
-
-        for name, stone in sunnah_stones.items():
-            with st.expander(f"{stone['name']} - {stone['arabic_name']}"):
-                col1, col2 = st.columns([2, 1])
-
-                with col1:
-                    st.markdown(f"**Color:** {stone['color']}")
-                    st.markdown("### Islamic Significance")
-                    st.write(stone["islamic_significance"])
-
-                with col2:
-                    st.info(f"🕌 Sunnah Stone")
-                    if stone.get("recommended_for"):
-                        st.markdown(f"**Recommended for:** {stone['recommended_for']}")
-
-    with tab2:
-        st.markdown("### Cultural & Historical Context")
-
-        for name, stone in stones.items():
-            with st.expander(f"{stone['name']} - {stone['color']}"):
-                st.markdown("### Cultural Significance")
-                st.write(stone.get("cultural_significance", "No data available"))
-
-    with tab3:
-        st.markdown("### Traditional Healing Properties")
-        st.info("⚠️ These are traditional beliefs, not medical advice")
-
-        for name, stone in stones.items():
-            with st.expander(f"{stone['name']}"):
-                st.write(stone.get("healing_properties", "No data available"))
 
 # =====================================================
 # PAGE: AI ASSISTANT
