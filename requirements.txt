@@ -1,0 +1,25 @@
+# =====================================================
+# requirements.txt - FIXED FOR WINDOWS
+# Pre-built wheels that don't need C compiler
+# =====================================================
+
+# Core Dependencies (with pre-built wheels)
+streamlit>=1.29.0
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.0
+
+# LangChain (using compatible versions)
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-google-genai>=0.0.6
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+
+# OpenAI SDK (for DeepSeek compatibility)
+openai>=1.0.0
+
+# Additional Tools
+requests>=2.31.0
+
+# Note: NumPy and other dependencies will be installed automatically
+# as pre-built wheels by Streamlit and other packages
