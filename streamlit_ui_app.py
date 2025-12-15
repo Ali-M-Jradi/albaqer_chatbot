@@ -13,12 +13,12 @@ from datetime import datetime
 
 # Import multi-agent system
 try:
-    from albaqer_agents_system import run_multi_agent_system
+    from main import run_multi_agent_system
 
     AGENTS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     AGENTS_AVAILABLE = False
-    st.warning("⚠️ Multi-agent system not available. Install requirements first.")
+    print(f"Warning: Could not import multi-agent system - {str(e)}")
 
 load_dotenv()
 
