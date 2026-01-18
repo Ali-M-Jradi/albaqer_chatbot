@@ -1,6 +1,5 @@
 # =====================================================
-# requirements.txt - FIXED FOR WINDOWS
-# Pre-built wheels that don't need C compiler
+# requirements.txt - Updated for pgvector + FastAPI
 # =====================================================
 
 # Core Dependencies (with pre-built wheels)
@@ -17,6 +16,18 @@ langchain-community>=0.0.20
 
 # OpenAI SDK (for DeepSeek compatibility)
 openai>=1.0.0
+
+# FastAPI & Server (NEW - for mobile integration)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
+# pgvector (NEW - for PostgreSQL vector search)
+pgvector>=0.2.4
+
+# Embeddings & Vector Search
+sentence-transformers>=2.2.0
+chromadb>=0.4.0
 
 # Additional Tools
 requests>=2.31.0

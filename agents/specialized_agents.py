@@ -1,20 +1,84 @@
 # =====================================================
 # Specialized Agents (1-10)
+# Simplified - using direct tool calls
 # =====================================================
 
-from langchain.agents import create_agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from config.settings import get_deepseek, get_gemini
-from middleware.dynamic_routing import dynamic_model_selection
 from tools import (
     search_products,
     check_stock,
     get_stone_info,
-    get_knowledge_base,
     compare_products,
-    convert_currency,
-    calculate_delivery_fee,
-    get_payment_methods,
+    add_to_cart,
+    view_cart,
+    remove_from_cart,
+    get_order_history,
+    get_order_details,
+    track_order_status,
+    get_product_reviews,
+    get_top_rated_products,
+    get_review_summary,
 )
+
+
+class SimpleAgent:
+    """Simple agent that calls tools and formats response"""
+
+    def __init__(self, model, tools, system_prompt):
+        self.model = model
+        self.tools = {tool.name: tool for tool in tools}
+        self.system_prompt = system_prompt
+
+    def invoke(self, inputs):
+        user_input = inputs.get("input", "")
+
+        # Try to call relevant tools
+        result_parts = []
+        for tool_name, tool in self.tools.items():
+            try:
+                # Simple keyword matching to decide if tool is relevant
+                if any(
+                    keyword in user_input.lower()
+                    for keyword in [
+                        "search",
+                        "find",
+                        "show",
+                        "diamond",
+                        "ring",
+                        "necklace",
+                        "sapphire",
+                        "ruby",
+                        "emerald",
+                        "stone",
+                        "product",
+                    ]
+                ):
+                    if tool_name == "search_products":
+                        # Extract filters from query
+                        tool_result = tool.func()
+                        if tool_result:
+                            result_parts.append(f"Found products: {tool_result}")
+            except Exception as e:
+                continue
+
+        # If tools returned results, format them
+        if result_parts:
+            return {"output": "\n\n".join(result_parts)}
+
+        # Otherwise use LLM
+        prompt = ChatPromptTemplate.from_messages(
+            [("system", self.system_prompt), ("human", "{input}")]
+        )
+        chain = prompt | self.model | StrOutputParser()
+        response = chain.invoke({"input": user_input})
+        return {"output": response}
+
+
+def create_agent(model, tools, system_prompt, middleware=None):
+    """Helper to create simple agent"""
+    return SimpleAgent(model, tools, system_prompt)
 
 
 # =====================================================
@@ -40,25 +104,23 @@ Be helpful, concise, and culturally sensitive.""",
 
 
 # =====================================================
-# AGENT 2: ISLAMIC KNOWLEDGE AGENT
+# AGENT 2: STONE EDUCATION AGENT
 # =====================================================
-def create_knowledge_agent():
-    """Agent specialized in gemstone education and Islamic significance"""
+def create_stone_education_agent():
+    """Agent specialized in gemstone education"""
     return create_agent(
         model=get_deepseek(),
         middleware=[],
-        tools=[get_stone_info, get_knowledge_base],
-        system_prompt="""You are an Islamic gemstone education expert at AlBaqer Stones.
+        tools=[get_stone_info],
+        system_prompt="""You are a gemstone education expert at AlBaqer Jewelry.
 
 Your role:
-- Educate customers about gemstones and their significance
+- Educate customers about gemstones and their properties
 - Use get_stone_info for specific stone details
-- Use get_knowledge_base for broader educational content
-- Explain Islamic significance respectfully (hadiths, Sunnah, spiritual meanings)
-- Also provide universal gemological facts for all customers
-- Cite sources when mentioning Islamic traditions
+- Provide gemological facts and care instructions
+- Help customers understand stone quality and characteristics
 
-Be knowledgeable, respectful, and educational.""",
+Be knowledgeable and helpful.""",
     )
 
 
@@ -70,14 +132,13 @@ def create_recommendation_agent():
     return create_agent(
         model=get_deepseek(),
         middleware=[],
-        tools=[search_products, get_stone_info],
-        system_prompt="""You are a personalized recommendation specialist at AlBaqer Stones.
+        tools=[search_products, get_stone_info, get_top_rated_products],
+        system_prompt="""You are a personalized recommendation specialist at AlBaqer Jewelry.
 
 Your role:
-- Understand customer preferences (budget, occasion, gender, beliefs)
+- Understand customer preferences (budget, occasion, style)
 - Recommend products that match their needs
-- Consider Islamic significance for Muslim customers
-- Suggest universal appeal items for others
+- Consider top-rated products for quality assurance
 - Explain why you recommend each item
 
 Ask clarifying questions if needed. Be personalized and thoughtful.""",
@@ -92,12 +153,13 @@ def create_comparison_agent():
     return create_agent(
         model=get_gemini(),
         middleware=[],
-        tools=[compare_products, get_stone_info],
-        system_prompt="""You are a product comparison specialist at AlBaqer Stones.
+        tools=[compare_products, get_stone_info, get_review_summary],
+        system_prompt="""You are a product comparison specialist at AlBaqer Jewelry.
 
 Your role:
 - Compare products objectively
-- Highlight differences in price, materials, stones, significance
+- Highlight differences in price, materials, stones, ratings
+- Include customer reviews and ratings in comparisons
 - Help customers make informed decisions
 - Present comparisons in clear, structured format
 
@@ -106,65 +168,65 @@ Use tables or bullet points. Be objective and helpful.""",
 
 
 # =====================================================
-# AGENT 5: PRICING & CURRENCY AGENT
+# AGENT 5: CART AGENT
 # =====================================================
-def create_pricing_agent():
-    """Agent specialized in pricing and currency conversion"""
+def create_cart_agent():
+    """Agent specialized in shopping cart management"""
     return create_agent(
         model=get_gemini(),
         middleware=[],
-        tools=[convert_currency, search_products],
-        system_prompt="""You are a pricing and currency specialist for Lebanese market.
+        tools=[add_to_cart, view_cart, remove_from_cart],
+        system_prompt="""You are a shopping cart specialist at AlBaqer Jewelry.
 
 Your role:
-- Convert prices between USD, LBP, and EUR
-- Explain parallel market vs official rates
-- Help customers understand pricing in their preferred currency
-- Warn about LBP volatility
+- Help customers add products to their cart
+- Show cart contents and totals
+- Remove items from cart
+- Guide customers through the shopping process
 
-Be clear about which rate you're using (official vs parallel).""",
+Be helpful and clear about cart operations.""",
     )
 
 
 # =====================================================
-# AGENT 6: DELIVERY & LOGISTICS AGENT
+# AGENT 6: ORDER AGENT
 # =====================================================
-def create_delivery_agent():
-    """Agent specialized in delivery and logistics"""
+def create_order_agent():
+    """Agent specialized in order management and tracking"""
     return create_agent(
         model=get_gemini(),
         middleware=[],
-        tools=[calculate_delivery_fee],
-        system_prompt="""You are a delivery and logistics specialist for Lebanon.
+        tools=[get_order_history, get_order_details, track_order_status],
+        system_prompt="""You are an order management specialist at AlBaqer Jewelry.
 
 Your role:
-- Calculate delivery fees based on location
-- Provide estimated delivery times
-- Inform about delivery zones and restrictions
-- Handle Lebanese governorates (Beirut, Mount Lebanon, North, South, Bekaa)
+- Show customer order history
+- Provide detailed order information
+- Track order status and updates
+- Answer questions about past purchases
 
-Be clear about delivery times and any location-specific challenges.""",
+Be clear about order details and status.""",
     )
 
 
 # =====================================================
-# AGENT 7: PAYMENT AGENT
+# AGENT 7: REVIEW AGENT
 # =====================================================
-def create_payment_agent():
-    """Agent specialized in payment methods"""
+def create_review_agent():
+    """Agent specialized in product reviews and ratings"""
     return create_agent(
         model=get_gemini(),
         middleware=[],
-        tools=[get_payment_methods],
-        system_prompt="""You are a payment specialist for AlBaqer Stones.
+        tools=[get_product_reviews, get_top_rated_products, get_review_summary],
+        system_prompt="""You are a customer review specialist at AlBaqer Jewelry.
 
 Your role:
-- Explain available payment methods (Cash, OMT, Whish, Bank Transfer, Crypto)
-- Guide customers through payment process
-- Explain fees and requirements
-- Handle Lebanese payment methods specifically
+- Show product reviews and ratings
+- Help customers find top-rated products
+- Provide review summaries and statistics
+- Help customers make informed decisions based on ratings
 
-Be clear about fees and processing times.""",
+Be objective and helpful with review information.""",
     )
 
 
@@ -176,12 +238,12 @@ def create_customer_service_agent():
     return create_agent(
         model=get_gemini(),
         middleware=[dynamic_model_selection],
-        tools=[search_products, get_payment_methods, calculate_delivery_fee],
-        system_prompt="""You are a friendly customer service representative at AlBaqer Islamic Gemstone Store.
+        tools=[search_products, view_cart],
+        system_prompt="""You are a friendly customer service representative at AlBaqer Jewelry.
 
 Your role:
 - Answer general inquiries
-- Help with order process
+- Help with shopping and order process
 - Handle complaints gracefully
 - Provide store information
 - Route complex questions to specialized agents
@@ -191,24 +253,23 @@ Be friendly, professional, and helpful.""",
 
 
 # =====================================================
-# AGENT 9: CULTURAL ADVISOR AGENT
+# AGENT 9: QUALITY ASSURANCE AGENT
 # =====================================================
-def create_cultural_agent():
-    """Agent for cultural guidance and Islamic traditions"""
+def create_quality_agent():
+    """Agent for product quality and ratings"""
     return create_agent(
         model=get_gemini(),
         middleware=[],
-        tools=[get_stone_info, get_knowledge_base],
-        system_prompt="""You are a cultural advisor specializing in Islamic jewelry traditions.
+        tools=[get_top_rated_products, get_review_summary, get_product_reviews],
+        system_prompt="""You are a quality assurance specialist at AlBaqer Jewelry.
 
 Your role:
-- Advise on culturally appropriate choices
-- Explain men's vs women's jewelry in Islam (gold prohibition for men)
-- Guide on occasions (Eid, Ramadan, Hajj gifts)
-- Respect diverse customer backgrounds
-- Explain Zakat on gold/silver when relevant
+- Help customers find high-quality products
+- Show top-rated items by category
+- Explain rating systems and review summaries
+- Guide customers to trusted products
 
-Be respectful, knowledgeable, and inclusive.""",
+Be objective and helpful with quality information.""",
     )
 
 

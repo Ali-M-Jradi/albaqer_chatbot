@@ -9,22 +9,11 @@ from agents import ALL_AGENTS
 def run_multi_agent_system(user_query: str) -> Dict[str, Any]:
     """
     Main function implementing multi-agent workflow with supervisor pattern
-    Includes automatic fallback if Gemini fails
     """
     try:
         # Step 1: Supervisor routes the query
         supervisor = ALL_AGENTS["SUPERVISOR_AGENT"]()
-
-        routing_result = supervisor.invoke(
-            {
-                "messages": [
-                    {"role": "user", "content": f"Route this query: {user_query}"}
-                ]
-            }
-        )
-
-        # Extract agent name from supervisor response
-        agent_name = routing_result["messages"][-1].content.strip()
+        agent_name = supervisor.invoke({"input": user_query}).strip()
 
         # Handle cases where supervisor returns full sentences
         for key in ALL_AGENTS.keys():
@@ -33,19 +22,14 @@ def run_multi_agent_system(user_query: str) -> Dict[str, Any]:
                 break
 
         # Step 2: Execute with selected agent
-        if agent_name in ALL_AGENTS:
-            agent_func = ALL_AGENTS[agent_name]
-            selected_agent = agent_func()
-
-            result = selected_agent.invoke(
-                {"messages": [{"role": "user", "content": user_query}]}
-            )
+        if agent_name in ALL_AGENTS and agent_name != "SUPERVISOR_AGENT":
+            selected_agent = ALL_AGENTS[agent_name]()
+            result = selected_agent.invoke({"input": user_query})
 
             return {
                 "query": user_query,
                 "routed_to": agent_name,
-                "response": result["messages"][-1].content,
-                "full_conversation": result["messages"],
+                "response": result["output"],
             }
         else:
             # Fallback to customer service
