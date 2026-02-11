@@ -35,7 +35,7 @@ class SimpleAgent:
         user_input = inputs.get("input", "")
 
         # Try to call relevant tools
-        result_parts = []
+        tool_results = []
         for tool_name, tool in self.tools.items():
             try:
                 # Simple keyword matching to decide if tool is relevant
@@ -59,17 +59,42 @@ class SimpleAgent:
                         # Extract filters from query
                         tool_result = tool.func()
                         if tool_result:
-                            result_parts.append(f"Found products: {tool_result}")
+                            tool_results.append(f"Product search results: {tool_result}")
             except Exception as e:
                 continue
 
-        # If tools returned results, format them
-        if result_parts:
-            return {"output": "\n\n".join(result_parts)}
+        # If tools returned results, format them through the LLM
+        if tool_results:
+            format_prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        f"""{self.system_prompt}
 
-        # Otherwise use LLM
+You have received data from the database. Your task is to format this data into a helpful, 
+natural language response for the customer. DO NOT return raw JSON. Instead:
+
+1. Present products in a clear, readable format
+2. Include key details: name, price, stone type, rating
+3. Use simple dashes (-) for lists, no special formatting
+4. Add helpful context or recommendations
+5. Keep the tone friendly and professional
+
+IMPORTANT: Do NOT use any markdown formatting. No asterisks (*), no bold (**), no code blocks (```), 
+no backticks (`), no headers (#). Use plain text only with simple dashes for lists.
+
+If there are no products found, suggest alternatives or ask clarifying questions.""",
+                    ),
+                    ("human", "User asked: {user_input}\n\nDatabase returned: {tool_data}\n\nFormat this into a helpful plain text response:"),
+                ]
+            )
+            chain = format_prompt | self.model | StrOutputParser()
+            response = chain.invoke({"user_input": user_input, "tool_data": "\n".join(tool_results)})
+            return {"output": response}
+
+        # Otherwise use LLM directly
         prompt = ChatPromptTemplate.from_messages(
-            [("system", self.system_prompt), ("human", "{input}")]
+            [("system", self.system_prompt + "\n\nIMPORTANT: Respond in plain text only. Do NOT use markdown formatting like asterisks (*), bold (**), code blocks (```), backticks (`), or headers (#). Use simple dashes (-) for lists."), ("human", "{input}")]
         )
         chain = prompt | self.model | StrOutputParser()
         response = chain.invoke({"input": user_input})
