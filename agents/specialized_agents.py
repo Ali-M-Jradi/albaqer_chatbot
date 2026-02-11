@@ -59,7 +59,9 @@ class SimpleAgent:
                         # Extract filters from query
                         tool_result = tool.func()
                         if tool_result:
-                            tool_results.append(f"Product search results: {tool_result}")
+                            tool_results.append(
+                                f"Product search results: {tool_result}"
+                            )
             except Exception as e:
                 continue
 
@@ -85,16 +87,28 @@ no backticks (`), no headers (#). Use plain text only with simple dashes for lis
 
 If there are no products found, suggest alternatives or ask clarifying questions.""",
                     ),
-                    ("human", "User asked: {user_input}\n\nDatabase returned: {tool_data}\n\nFormat this into a helpful plain text response:"),
+                    (
+                        "human",
+                        "User asked: {user_input}\n\nDatabase returned: {tool_data}\n\nFormat this into a helpful plain text response:",
+                    ),
                 ]
             )
             chain = format_prompt | self.model | StrOutputParser()
-            response = chain.invoke({"user_input": user_input, "tool_data": "\n".join(tool_results)})
+            response = chain.invoke(
+                {"user_input": user_input, "tool_data": "\n".join(tool_results)}
+            )
             return {"output": response}
 
         # Otherwise use LLM directly
         prompt = ChatPromptTemplate.from_messages(
-            [("system", self.system_prompt + "\n\nIMPORTANT: Respond in plain text only. Do NOT use markdown formatting like asterisks (*), bold (**), code blocks (```), backticks (`), or headers (#). Use simple dashes (-) for lists."), ("human", "{input}")]
+            [
+                (
+                    "system",
+                    self.system_prompt
+                    + "\n\nIMPORTANT: Respond in plain text only. Do NOT use markdown formatting like asterisks (*), bold (**), code blocks (```), backticks (`), or headers (#). Use simple dashes (-) for lists.",
+                ),
+                ("human", "{input}"),
+            ]
         )
         chain = prompt | self.model | StrOutputParser()
         response = chain.invoke({"input": user_input})
@@ -270,7 +284,7 @@ def create_customer_service_agent():
     """General customer service agent with gemstone domain restriction"""
     return create_agent(
         model=get_gemini(),
-        middleware=[dynamic_model_selection],
+        middleware=[],
         tools=[search_products, view_cart],
         system_prompt="""You are a friendly customer service representative at AlBaqer Islamic Gemstone Store.
 

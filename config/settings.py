@@ -31,16 +31,18 @@ def get_deepseek():
 
 
 def get_gemini():
-    """Returns Gemini model with fallback to DeepSeek"""
+    """Returns Gemini model with automatic runtime fallback to DeepSeek"""
     try:
-        return ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-latest",
+        gemini = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
             api_key=os.getenv("GEMINI_API_KEY"),
             temperature=0.7,
             max_tokens=None,
             timeout=None,
             max_retries=2,
         )
+        # with_fallbacks handles runtime errors (429 quota, 404 not found, etc.)
+        return gemini.with_fallbacks([get_deepseek()])
     except Exception as e:
-        print(f"⚠️ Gemini unavailable: {str(e)[:100]}... Falling back to DeepSeek")
+        print(f"⚠️ Gemini init failed: {str(e)[:100]}... Falling back to DeepSeek")
         return get_deepseek()
